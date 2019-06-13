@@ -28,16 +28,16 @@ impl<T: Display> From<T> for TerminalFailure {
     }
 }
 
-impl From<i32> for TerminalFailure {
-    fn from(status_code: i32) -> TerminalFailure {
+impl<T: Into<i32> + Display> From<T> for TerminalFailure {
+    default fn from(t: T) -> TerminalFailure {
         TerminalFailure {
-            status_code,
-            error: String::from("unknown"),
+            error: format!("{}", t),
+            status_code: t.into(),
         }
     }
 }
 
-enum TerminalResult<T = Box<dyn Error>> {
+enum TerminalResult<T = TerminalFailure> {
     Success,
     Failure(T),
 }
@@ -75,7 +75,7 @@ impl<T: Into<TerminalFailure>> Try for TerminalResult<T> {
     }
 }
 
-fn main() -> TerminalResult<TerminalFailure> {
+fn main() -> TerminalResult /*<Box<dyn Error>>*/ {
     let config = Config::try_from(env::args())?;
 
     let contents = fs::read_to_string(config.filename)?;
@@ -104,6 +104,21 @@ impl Display for ConfigError {
             ConfigError::TooFewArgs => "too few arguments",
         }
         .fmt(f)
+    }
+}
+
+impl From<ConfigError> for i32 {
+    fn from(err: ConfigError) -> Self {
+        match err {
+            ConfigError::TooFewArgs => 2,
+        }
+    }
+}
+
+impl Termination for ConfigError {
+    fn report(self) -> i32 {
+        eprintln!("error: {}", self);
+        self.into()
     }
 }
 
